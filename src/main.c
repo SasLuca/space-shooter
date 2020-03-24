@@ -11,7 +11,6 @@
 #define LASER_SPEED (10)
 
 #define ENEMY_ANIM_DURATION (1)
-#define PLAYER_DAMAGE_FLASH_ANIM_DURATION (10.f)
 
 #define ASSET_PATH "../assets/"
 
@@ -57,6 +56,7 @@ Texture player_texture;
 Texture background_texture;
 Texture player_laser_texture;
 Texture enemy_texture;
+Texture enemy_laser_texture;
 
 int player_x;
 int player_y;
@@ -64,7 +64,10 @@ int player_y;
 int player_lives;
 int score;
 
-#define PLAYER_ANIM_FLASH_COUNT (5)
+bool enemies_are_alive;
+
+#define PLAYER_ANIM_FLASH_COUNT (3)
+#define PLAYER_DAMAGE_FLASH_ANIM_DURATION (0.15f)
 
 float player_damaged_anim_playing;
 float player_damaged_anim_timer;
@@ -101,10 +104,11 @@ int main(void)
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "DOOM Eternal");
     SetTargetFPS(60);
 
-    player_texture = LoadTexture(ASSET_PATH"spaceship.png");
     background_texture = LoadTexture(ASSET_PATH"background.png");
+    player_texture = LoadTexture(ASSET_PATH"spaceship.png");
     player_laser_texture = LoadTexture(ASSET_PATH"player-laser.png");
-    enemy_texture = LoadTexture(ASSET_PATH"enemy.png");
+    enemy_texture = LoadTexture(ASSET_PATH"tsoding.png");
+    enemy_laser_texture  = LoadTexture(ASSET_PATH"php.png");
 
     reset_game();
 
@@ -124,7 +128,7 @@ int main(void)
             if (player_x + player_texture.width > SCREEN_WIDTH) player_x = SCREEN_WIDTH - player_texture.width;
             if (player_y + player_texture.height > SCREEN_HEIGHT) player_y = SCREEN_HEIGHT - player_texture.height;
 
-            if (player_lives == 0 && IsKeyPressed(KEY_ENTER))
+            if ((player_lives == 0 || !enemies_are_alive) && IsKeyPressed(KEY_ENTER))
             {
                 reset_game();
             }
@@ -254,8 +258,11 @@ int main(void)
             }
 
             // Update enemies
+            enemies_are_alive = false;
             for (int i = 0; i < MAX_ENEMY_COUNT; i++)
             {
+                enemies_are_alive = enemies_are_alive || enemies[i].active;
+
                 if (enemies[i].active)
                 {
                     enemies[i].x = (int) EaseQuadInOut(enemies[i].timer, enemies[i].begin_x, enemies[i].target_x - enemies[i].begin_x, ENEMY_ANIM_DURATION);
@@ -304,6 +311,7 @@ int main(void)
 
             DrawTextureEx(background_texture, (Vector2){0}, 0, SCALE, WHITE);
 
+            // Render the player
             if (player_lives > 0)
             {
                 unsigned char color_begin = (player_damaged_anim_retracting) ? 255 : 0;
@@ -322,6 +330,7 @@ int main(void)
                     }
 
                     player_damaged_anim_retracting = !player_damaged_anim_retracting;
+                    player_damaged_anim_timer = 0;
                 }
 
                 if (player_damaged_anim_playing) player_damaged_anim_timer += GetFrameTime();
@@ -329,6 +338,7 @@ int main(void)
                 DrawTexture(player_texture, player_x, player_y, WHITE);
                 DrawTexture(player_texture, player_x, player_y, (Color) { RED.r, RED.g, RED.b, color });
             }
+            // Render game over screen
             else
             {
                 int font_size = GetFontDefault().baseSize * 5;
@@ -349,8 +359,8 @@ int main(void)
             // Drawing the laser
             for (int i = 0; i < MAX_LASER_COUNT; i++)
             {
-                if (lasers[i].left_active)  DrawTexture(player_laser_texture, lasers[i].x, lasers[i].y, WHITE);
-                if (lasers[i].right_active) DrawTexture(player_laser_texture, lasers[i].x + player_texture.width - player_laser_texture.width, lasers[i].y, WHITE);
+                if (lasers[i].left_active)  DrawTexture(lasers[i].is_enemy_beam ? enemy_laser_texture : player_laser_texture, lasers[i].x, lasers[i].y, WHITE);
+                if (lasers[i].right_active) DrawTexture(lasers[i].is_enemy_beam ? enemy_laser_texture : player_laser_texture, lasers[i].x + player_texture.width - player_laser_texture.width, lasers[i].y, WHITE);
             }
 
             // Render the score
@@ -397,6 +407,14 @@ int main(void)
                 const char* text = TextFormat("HP: %d", player_lives * 1000);
                 int text_width = MeasureText(text, font_size);
                 DrawText(text, SCREEN_WIDTH - text_width - 20, 20, font_size, WHITE);
+            }
+
+            if (!enemies_are_alive)
+            {
+                int font_size = GetFontDefault().baseSize * 5;
+                Vector2 text_size = MeasureTextEx(GetFontDefault(), "YOU WIN DOOM ETERNAL", font_size, 2);
+                Vector2 text_pos  = (Vector2) { SCREEN_WIDTH / 2 - text_size.x / 2, SCREEN_HEIGHT / 2 - text_size.y / 2 };
+                DrawTextEx(GetFontDefault(), "YOU WIN DOOM ETERNAL", text_pos, font_size, 2, WHITE);
             }
 
             EndDrawing();
